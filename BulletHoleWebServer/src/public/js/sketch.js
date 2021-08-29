@@ -177,6 +177,9 @@ window.updateP5 = (server, round, noChanges) => {
 
     if (!noChanges || !Object.keys(previousUserColors).includes(userId)) {
 
+      if (noChanges) {
+        data[curServer][curRound].enabledUsers.push(userId)
+      }
       let colorIndex = ~~(Math.random() * data[curServer][curRound].availableColors.length)
       let color = colors[data[curServer][curRound].availableColors[colorIndex]]
       data[curServer][curRound].availableColors.splice(colorIndex, 1)
