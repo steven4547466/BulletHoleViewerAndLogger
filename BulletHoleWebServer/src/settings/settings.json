@@ -1,0 +1,8 @@
+{
+  "webPort" : 4950,
+  "postPort": 4951,
+  "authentication": {
+    "enabled": false,
+    "key": ""
+  }
+}
