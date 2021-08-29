@@ -8,7 +8,7 @@
   <script src="./js/p5/p5.min.js"></script>
   <script src="./js/sketch.js"></script>
   <script>
-    function onLoad() {
+    function onLoad(force) {
       fetch(window.location.protocol + "//" + window.location.host + "/bullets")
         .then(response => response.json())
         .then(data => {
@@ -47,16 +47,17 @@
             serverSelectorContent.appendChild(dropdownItemDiv)
           }
 
-          var dropdown = document.querySelector("#server-dropdown-button");
-          dropdown.addEventListener("click", function (event) {
-            event.stopPropagation();
-            document.querySelector("#server-dropdown").classList.toggle("is-active");
-          });
+          if (!force) {
+            var dropdown = document.querySelector("#server-dropdown-button");
+            dropdown.addEventListener("click", function (event) {
+              event.stopPropagation();
+              document.querySelector("#server-dropdown").classList.toggle("is-active");
+            });
+          }
 
           let dropdownContent = document.querySelector("#server-dropdown").querySelector(".dropdown-content").children
           for (let child of dropdownContent) {
             let dropDownServerButton = child.querySelector(".is-dropdown-button")
-            // console.log(dropDownServerButton)
             if (dropDownServerButton != null) {
               dropDownServerButton.addEventListener("click", function (event) {
                 let serverId = dropDownServerButton.id.match(/\d+/)[0]
@@ -95,6 +96,17 @@
             }
           }
         })
+      if (!force) {
+        document.getElementById("refresh-data").addEventListener("click", function (event) {
+          event.stopPropagation();
+          let serverSelectorContent = document.getElementById("server-selector-dropdown-content")
+          while (serverSelectorContent.firstChild) {
+            serverSelectorContent.removeChild(serverSelectorContent.firstChild)
+          }
+          onLoad(true);
+          window.refreshP5Data();
+        })
+      }
     }
   </script>
 </head>
@@ -115,6 +127,9 @@
           </div>
         </div>
       </div>
+      <button id="refresh-data" class="button">
+        <span>Refresh</span>
+      </button>
     </div>
     <main class="column">
 

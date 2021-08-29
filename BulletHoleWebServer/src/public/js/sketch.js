@@ -8,7 +8,7 @@ let by;
 let curServer;
 let curRound;
 let colors;
-let extraShapes;
+let previousUserColors;
 
 function setup() {
   createCanvas(800, 800, WEBGL);
@@ -18,7 +18,7 @@ function setup() {
   offsetX = width / 2;
   offsetY = width / 2;
   holes = [];
-  extraShapes = []
+  previousUserColors = []
   fetch(window.location.protocol + "//" + window.location.host + "/bullets")
     .then(response => response.json())
     .then(d => {
@@ -159,214 +159,198 @@ function setup() {
   }
 }
 
-window.updateP5 = (server, round) => {
+window.updateP5 = (server, round, noChanges) => {
   holes = []
-  extraShapes = []
   curServer = server;
   curRound = round;
-  data[curServer][curRound].availableColors = Object.keys(colors)
-  data[curServer][curRound].enabledUsers = Object.keys(data[curServer][curRound])
   let userArea = document.getElementById("users")
-  while (userArea.firstChild) {
-    userArea.removeChild(userArea.firstChild);
+  if (!noChanges) {
+    data[curServer][curRound].availableColors = Object.keys(colors)
+    data[curServer][curRound].enabledUsers = Object.keys(data[curServer][curRound])
+    while (userArea.firstChild) {
+      userArea.removeChild(userArea.firstChild);
+    }
   }
   let dropdowns = []
   for (let [userId, d] of Object.entries(data[curServer][curRound])) {
     if (!d.bullets) continue;
-    let colorIndex = ~~(Math.random() * data[curServer][curRound].availableColors.length)
-    let color = colors[data[curServer][curRound].availableColors[colorIndex]]
-    data[curServer][curRound].availableColors.splice(colorIndex, 1)
-    data[curServer][curRound][userId].color = color
-    let brightness = Math.round(((parseInt(color[0]) * 299) +
-      (parseInt(color[1]) * 587) +
-      (parseInt(color[2]) * 114)) / 1000);
-    let textColor = (brightness > 125) ? 'black' : 'white';
-    let dropdownDiv = document.createElement("div")
-    dropdownDiv.classList.add("dropdown")
-    dropdownDiv.id = `dropdown-${userId}`
-    dropdownDiv.style.width = "100%";
 
-    dropdowns.push(dropdownDiv)
+    if (!noChanges || !Object.keys(previousUserColors).includes(userId)) {
 
-    let dropDownTrigger = document.createElement("div")
-    dropDownTrigger.classList.add("dropdown-trigger")
-    dropDownTrigger.style.width = "100%";
-    dropdownDiv.appendChild(dropDownTrigger)
+      let colorIndex = ~~(Math.random() * data[curServer][curRound].availableColors.length)
+      let color = colors[data[curServer][curRound].availableColors[colorIndex]]
+      data[curServer][curRound].availableColors.splice(colorIndex, 1)
+      data[curServer][curRound][userId].color = color
+      let brightness = Math.round(((parseInt(color[0]) * 299) +
+        (parseInt(color[1]) * 587) +
+        (parseInt(color[2]) * 114)) / 1000);
+      let textColor = (brightness > 125) ? 'black' : 'white';
+      let dropdownDiv = document.createElement("div")
+      dropdownDiv.classList.add("dropdown")
+      dropdownDiv.id = `dropdown-${userId}`
+      dropdownDiv.style.width = "100%";
 
-    let button = document.createElement("button")
-    button.classList.add("enabled")
-    button.id = `${userId}-dropdown-button`
-    button.style = `color: ${textColor}; background-color: rgb(${color.join(", ")}); width:50%; text-align: center; margin-top:0.5em;`
-    button.innerText = d.name
-    button.addEventListener("click", function (event) {
-      event.stopPropagation();
-      if (dropdownDiv.classList.contains("is-active")) {
-        dropdownDiv.classList.toggle("is-active")
+      dropdowns.push(dropdownDiv)
+
+      let dropDownTrigger = document.createElement("div")
+      dropDownTrigger.classList.add("dropdown-trigger")
+      dropDownTrigger.style.width = "100%";
+      dropdownDiv.appendChild(dropDownTrigger)
+
+      let button = document.createElement("button")
+      button.classList.add("enabled")
+      button.id = `${userId}-dropdown-button`
+      button.style = `color: ${textColor}; background-color: rgb(${color.join(", ")}); width:50%; text-align: center; margin-top:0.5em;`
+      button.innerText = d.name
+      button.addEventListener("click", function (event) {
+        event.stopPropagation();
+        if (dropdownDiv.classList.contains("is-active")) {
+          dropdownDiv.classList.toggle("is-active")
+        } else {
+          for (let dropdown of dropdowns) {
+            dropdown.classList.remove("is-active")
+          }
+          dropdownDiv.classList.add("is-active")
+        }
+      })
+
+      let dropDownMenuDiv = document.createElement("div")
+      dropDownMenuDiv.classList.add("dropdown-menu")
+      dropDownMenuDiv.id = `${userId}-dropdown-menu`
+      dropDownMenuDiv.role = "menu"
+      dropDownMenuDiv.style.width = "100%"
+      dropdownDiv.appendChild(dropDownMenuDiv)
+
+      let dropDownContentDiv = document.createElement("div")
+      dropDownContentDiv.classList.add("dropdown-content")
+      dropDownContentDiv.id = `${userId}-dropdown-content`
+      dropDownContentDiv.style.width = "50%"
+      dropDownMenuDiv.appendChild(dropDownContentDiv)
+
+      let toggle = document.createElement("button")
+      toggle.classList.add("dropdown-item", "is-dark", "button")
+      toggle.innerText = "Toggle"
+      toggle.addEventListener("click", function (event) {
+        event.stopPropagation();
+        if (window.setUserEnabled(userId, false, true)) {
+          button.classList.add("enabled")
+        } else {
+          button.classList.remove("enabled")
+        }
+      })
+      dropDownContentDiv.appendChild(toggle)
+
+      let teleportToBullet = document.createElement("button")
+      teleportToBullet.classList.add("dropdown-item", "is-dark", "button")
+      teleportToBullet.innerText = "Teleport"
+      teleportToBullet.addEventListener("click", function (event) {
+        event.stopPropagation();
+        if (button.classList.contains("enabled")) {
+          let bullets = holes.filter((bullet) => bullet.userId == userId)
+          let bulletNum = parseInt(prompt(`Enter bullet number to teleport to (1-${bullets.length})`, "1")) - 1
+          try {
+            if (isNaN(bulletNum)) return;
+            let pos = bullets[bulletNum].point
+            cam.setPosition(pos.x - 100, pos.y, pos.z);
+            cam.lookAt(pos.x, pos.y, pos.z);
+          } catch (e) {
+            alert("Bullet number is out of bounds. Max: " + bullets.length)
+          }
+        }
+      })
+      dropDownContentDiv.appendChild(teleportToBullet)
+
+      let teleportToBulletGroup = document.createElement("button")
+      teleportToBulletGroup.classList.add("dropdown-item", "is-dark", "button")
+      teleportToBulletGroup.innerText = "Teleport to group"
+      teleportToBulletGroup.addEventListener("click", function (event) {
+        event.stopPropagation();
+        if (data[curServer][curRound][userId].bulletGroups.length == 0) {
+          alert("No bullet groups fround.")
+          return;
+        }
+        if (button.classList.contains("enabled")) {
+          let groupNum = parseInt(prompt(`Enter bullet group number to teleport to (1-${data[curServer][curRound][userId].bulletGroups.length})`, "1")) - 1
+          try {
+            if (isNaN(groupNum)) return;
+            let pos = data[curServer][curRound][userId].bulletGroups[groupNum][0].point
+            cam.setPosition(pos.x - 100, pos.y, pos.z);
+            cam.lookAt(pos.x, pos.y, pos.z);
+          } catch (e) {
+            alert("Bullet group number is out of bounds. Max: " + data[curServer][curRound][userId].bulletGroups.length)
+          }
+        }
+      })
+      dropDownContentDiv.appendChild(teleportToBulletGroup)
+
+      let regroup = document.createElement("button")
+      regroup.classList.add("dropdown-item", "is-dark", "button")
+      regroup.innerText = "Regroup"
+      regroup.addEventListener("click", function (event) {
+        event.stopPropagation();
+        if (button.classList.contains("enabled")) {
+          let groupRadius = parseInt(prompt(`Enter a distance (default 4)`, "4")) * 250
+          if (isNaN(groupRadius)) return;
+          data[curServer][curRound][userId].bulletGroups = defineGroups(userId, groupRadius)
+        }
+      })
+      dropDownContentDiv.appendChild(regroup)
+
+      dropDownTrigger.appendChild(button)
+      if (!noChanges) {
+        userArea.appendChild(dropdownDiv)
       } else {
-        for (let dropdown of dropdowns) {
-          dropdown.classList.remove("is-active")
-        }
-        dropdownDiv.classList.add("is-active")
+        userArea.insertBefore(dropdownDiv, document.getElementById("toggle-all-users"))
       }
-      // let dropdownContent = document.querySelector(`#dropdown-${userId} .dropdown-content`)
-      // if (window.setUserEnabled(userId, false, true)) {
-      //   button.classList.add("enabled")
-      // } else {
-      //   button.classList.remove("enabled")
-      // }
-    })
-
-    let dropDownMenuDiv = document.createElement("div")
-    dropDownMenuDiv.classList.add("dropdown-menu")
-    dropDownMenuDiv.id = `${userId}-dropdown-menu`
-    dropDownMenuDiv.role = "menu"
-    dropDownMenuDiv.style.width = "100%"
-    dropdownDiv.appendChild(dropDownMenuDiv)
-
-    let dropDownContentDiv = document.createElement("div")
-    dropDownContentDiv.classList.add("dropdown-content")
-    dropDownContentDiv.id = `${userId}-dropdown-content`
-    dropDownContentDiv.style.width = "50%"
-    dropDownMenuDiv.appendChild(dropDownContentDiv)
-
-    let toggle = document.createElement("button")
-    toggle.classList.add("dropdown-item", "is-dark", "button")
-    toggle.innerText = "Toggle"
-    toggle.addEventListener("click", function (event) {
-      event.stopPropagation();
-      if (window.setUserEnabled(userId, false, true)) {
-        button.classList.add("enabled")
-      } else {
-        button.classList.remove("enabled")
+      for (let bullet of d.bullets) {
+        holes.push(new BulletHole(userId, new Point3D(parseFloat(bullet.x * 250), parseFloat(bullet.y * -250), parseFloat(bullet.z * 250)), color))
       }
-    })
-    dropDownContentDiv.appendChild(toggle)
+      data[curServer][curRound][userId].bulletGroups = defineGroups(userId)
+    } else {
+      data[curServer][curRound][userId].color = previousUserColors[userId]
+      for (let bullet of d.bullets) {
+        holes.push(new BulletHole(userId, new Point3D(parseFloat(bullet.x * 250), parseFloat(bullet.y * -250), parseFloat(bullet.z * 250)), previousUserColors[userId]))
+      }
+      data[curServer][curRound][userId].bulletGroups = defineGroups(userId)
+    }
+  }
 
-    let teleportToBullet = document.createElement("button")
-    teleportToBullet.classList.add("dropdown-item", "is-dark", "button")
-    teleportToBullet.innerText = "Teleport"
-    teleportToBullet.addEventListener("click", function (event) {
-      event.stopPropagation();
-      if (button.classList.contains("enabled")) {
-        let bullets = holes.filter((bullet) => bullet.userId == userId)
-        let bulletNum = parseInt(prompt(`Enter bullet number to teleport to (1-${bullets.length})`, "1")) - 1
-        try {
-          if (isNaN(bulletNum)) return;
-          let pos = bullets[bulletNum].point
-          cam.setPosition(pos.x - 100, pos.y, pos.z);
-          cam.lookAt(pos.x, pos.y, pos.z);
-        } catch (e) {
-          alert("Bullet number is out of bounds. Max: " + bullets.length)
+  if (!noChanges) {
+    let toggleAll = document.createElement("button")
+    toggleAll.innerText = "Toggle all"
+    toggleAll.style = `width:50%; text-align: center; margin-top:3em;`
+    toggleAll.classList.add("button", "is-dark")
+    toggleAll.id = "toggle-all-users"
+
+    toggleAll.addEventListener("click", () => {
+      for (let [userId, d] of Object.entries(data[curServer][curRound])) {
+        let button = document.getElementById(`${userId}-dropdown-button`)
+        if (window.setUserEnabled(userId, false, true)) {
+          button.classList.add("enabled")
+        } else {
+          button.classList.remove("enabled")
         }
       }
     })
-    dropDownContentDiv.appendChild(teleportToBullet)
 
-    let teleportToBulletGroup = document.createElement("button")
-    teleportToBulletGroup.classList.add("dropdown-item", "is-dark", "button")
-    teleportToBulletGroup.innerText = "Teleport to group"
-    teleportToBulletGroup.addEventListener("click", function (event) {
-      event.stopPropagation();
-      if (data[curServer][curRound][userId].bulletGroups.length == 0) {
-        alert("No bullet groups fround.")
-        return;
-      }
-      if (button.classList.contains("enabled")) {
-        let groupNum = parseInt(prompt(`Enter bullet group number to teleport to (1-${data[curServer][curRound][userId].bulletGroups.length})`, "1")) - 1
-        try {
-          if (isNaN(groupNum)) return;
-          let pos = data[curServer][curRound][userId].bulletGroups[groupNum][0].point
-          cam.setPosition(pos.x - 100, pos.y, pos.z);
-          cam.lookAt(pos.x, pos.y, pos.z);
-        } catch (e) {
-          alert("Bullet group number is out of bounds. Max: " + data[curServer][curRound][userId].bulletGroups.length)
-        }
-      }
-    })
-    dropDownContentDiv.appendChild(teleportToBulletGroup)
+    userArea.appendChild(toggleAll)
 
-    // let connectGroup = document.createElement("button")
-    // connectGroup.classList.add("dropdown-item", "is-dark", "button")
-    // connectGroup.innerText = "Connect group"
-    // connectGroup.addEventListener("click", function (event) {
-    //   event.stopPropagation();
-    //   if (button.classList.contains("enabled")) {
-    //     let groupNum = parseInt(prompt(`Enter bullet group number to connect (1-${data[curServer][curRound][userId].bulletGroups.length})`, "1")) - 1
-    //     try {
-    //       let prevBullet;
-    //       for (let bullet of data[curServer][curRound][userId].bulletGroups[groupNum]) {
-    //         if (prevBullet == null) {
-    //           prevBullet = bullet;
-    //           continue;
-    //         }
-    //         if (getDist(bullet.point, prevBullet.point) < 1000) {
-    //           connectPoints(bullet.point, prevBullet.point)
-    //         }
-    //         prevBullet = bullet
-    //       }
-    //     } catch (e) {
-    //       console.error(e)
-    //       alert("Bullet group number is out of bounds. Max: " + data[curServer][curRound][userId].bulletGroups.length)
-    //     }
-    //   }
-    // })
-    // dropDownContentDiv.appendChild(connectGroup)
+    userArea.appendChild(document.createElement("br"))
 
-    let regroup = document.createElement("button")
-    regroup.classList.add("dropdown-item", "is-dark", "button")
-    regroup.innerText = "Regroup"
-    regroup.addEventListener("click", function (event) {
-      event.stopPropagation();
-      if (button.classList.contains("enabled")) {
-        let groupRadius = parseInt(prompt(`Enter a distance (default 4)`, "4")) * 250
-        if (isNaN(groupRadius)) return;
+    let regroupAll = document.createElement("button")
+    regroupAll.innerText = "Regroup all"
+    regroupAll.style = `width:50%; text-align: center; margin-top:0.5em;`
+    regroupAll.classList.add("button", "is-dark")
+
+    regroupAll.addEventListener("click", () => {
+      let groupRadius = parseInt(prompt(`Enter a distance (default 4)`, "4")) * 250
+      if (isNaN(groupRadius)) return;
+      for (let [userId, d] of Object.entries(data[curServer][curRound])) {
         data[curServer][curRound][userId].bulletGroups = defineGroups(userId, groupRadius)
       }
     })
-    dropDownContentDiv.appendChild(regroup)
-
-    dropDownTrigger.appendChild(button)
-    userArea.appendChild(dropdownDiv)
-    for (let bullet of d.bullets) {
-      holes.push(new BulletHole(userId, new Point3D(parseFloat(bullet.x * 250), parseFloat(bullet.y * -250), parseFloat(bullet.z * 250)), color))
-    }
-    data[curServer][curRound][userId].bulletGroups = defineGroups(userId)
+    userArea.appendChild(regroupAll)
   }
-
-  let toggleAll = document.createElement("button")
-  toggleAll.innerText = "Toggle all"
-  toggleAll.style = `width:50%; text-align: center; margin-top:3em;`
-  toggleAll.classList.add("button", "is-dark")
-
-  toggleAll.addEventListener("click", () => {
-    for (let [userId, d] of Object.entries(data[curServer][curRound])) {
-      let button = document.getElementById(`${userId}-dropdown-button`)
-      if (window.setUserEnabled(userId, false, true)) {
-        button.classList.add("enabled")
-      } else {
-        button.classList.remove("enabled")
-      }
-    }
-  })
-
-  userArea.appendChild(toggleAll)
-
-  userArea.appendChild(document.createElement("br"))
-
-  let regroupAll = document.createElement("button")
-  regroupAll.innerText = "Regroup all"
-  regroupAll.style = `width:50%; text-align: center; margin-top:0.5em;`
-  regroupAll.classList.add("button", "is-dark")
-
-  regroupAll.addEventListener("click", () => {
-    let groupRadius = parseInt(prompt(`Enter a distance (default 4)`, "4")) * 250
-    if (isNaN(groupRadius)) return;
-    for (let [userId, d] of Object.entries(data[curServer][curRound])) {
-      data[curServer][curRound][userId].bulletGroups = defineGroups(userId, groupRadius)
-    }
-  })
-
-  userArea.appendChild(regroupAll)
 };
 
 window.setUserEnabled = (userId, enabled, toggle) => {
@@ -392,9 +376,26 @@ window.setUserEnabled = (userId, enabled, toggle) => {
   }
 }
 
-function connectPoints(point1, point2) {
-  let point = new Point3D((point1.x + point2.x) / 2, (point1.y + point2.y) / 2, (point1.z + point2.z) / 2)
-  extraShapes.push(new Box(point, [3, getDist(point1, point2), 3], [0, 0, 0], 0, 0, Math.atan2(point.y, point.x)))
+window.refreshP5Data = () => {
+  fetch(window.location.protocol + "//" + window.location.host + "/bullets")
+    .then(response => response.json())
+    .then(d => {
+      if (curRound) {
+        let availableColors = data[curServer][curRound].availableColors
+        previousUserColors = {}
+        for (let [userId, d2] of Object.entries(data[curServer][curRound])) {
+          if (!d2.bullets) continue;
+          previousUserColors[userId] = d2.color
+        }
+        let prevEnabledUsers = data[curServer][curRound].enabledUsers
+        data = d
+        data[curServer][curRound].enabledUsers = prevEnabledUsers
+        data[curServer][curRound].availableColors = availableColors
+        window.updateP5(curServer, curRound, true)
+      } else {
+        data = d
+      }
+    })
 }
 
 function getDist(point1, point2) {
@@ -467,9 +468,6 @@ function draw() {
     if (data[curServer] && data[curServer][curRound] && data[curServer][curRound].enabledUsers.includes(bulletHole.userId))
       bulletHole.draw();
   }
-  for (let shape of extraShapes) {
-    shape.draw()
-  }
 }
 
 function mousePressed() {
@@ -513,29 +511,6 @@ class BulletHole {
     rotateX(180);
     fill(this.color[0], this.color[1], this.color[2]);
     sphere(this.size, 200, 200);
-    pop();
-  }
-}
-
-class Box {
-  constructor(point, size, color, xRotation, yRotation, zRotation) {
-    this.point = point;
-    this.color = color || [100, 100, 100];
-    this.size = size || [1, 3, 1];
-    this.xRotation = xRotation;
-    this.yRotation = yRotation;
-    this.zRotation = zRotation;
-  }
-
-  draw() {
-    push();
-    angleMode(RADIANS);
-    translate(this.point.x, this.point.y, this.point.z);
-    rotateZ(this.zRotation);
-    // rotateY(this.yRotation);
-    // rotateX(this.xRotation)
-    fill(this.color[0], this.color[1], this.color[2]);
-    box(this.size[0], this.size[1], this.size[2]);
     pop();
   }
 }
