@@ -19,10 +19,14 @@ function setup() {
   offsetY = width / 2;
   holes = [];
   extraShapes = []
-  data = JSON.parse(document.getElementById("data").innerText)
-  curServer = '1';
-  curRound = null;
-  if (data[curServer]) curRound = data[curServer][Object.keys(data[curServer])[0]];
+  fetch(window.location.protocol + "//" + window.location.host + "/bullets")
+    .then(response => response.json())
+    .then(d => {
+      data = d
+      curServer = '1';
+      curRound = null;
+      if (data[curServer]) curRound = data[curServer][Object.keys(data[curServer])[0]];
+    })
   colors = {
     "Earth green": [39, 70, 45],
     "Slime green": [80, 109, 84],

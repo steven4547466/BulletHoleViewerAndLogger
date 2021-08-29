@@ -9,109 +9,92 @@
   <script src="./js/sketch.js"></script>
   <script>
     function onLoad() {
-      let data = JSON.parse(document.getElementById("data").innerText);
+      fetch(window.location.protocol + "//" + window.location.host + "/bullets")
+        .then(response => response.json())
+        .then(data => {
+          let serverSelectorContent = document.getElementById("server-selector-dropdown-content")
+          for (let serverNum of Object.keys(data).sort((a, b) => a - b)) {
+            let dropdownItemDiv = document.createElement("div")
+            dropdownItemDiv.classList.add("dropdown-item", "is-dark")
 
-/*
-<div class="dropdown-item is-dark">
-  <div class="dropdown" id="server-1-dropdown">
-    <div class="dropdown-trigger">
-      <button id="server-1-dropdown-button" class="button is-dropdown-button" aria-haspopup="true"
-        aria-controls="dropdown-menu">
-        <span>Server 1</span>
-      </button>
-    </div>
-    <div class="dropdown-menu" id="server-1-dropdown-menu" role="menu">
-      <div class="dropdown-content">
+            let serverDropdown = document.createElement("div")
+            serverDropdown.classList.add("dropdown")
+            serverDropdown.id = `server-${serverNum}-dropdown`
+            dropdownItemDiv.appendChild(serverDropdown)
 
-      </div>
-    </div>
-  </div>
-</div>
-*/
+            let dropdownTrigger = document.createElement("div")
+            dropdownTrigger.classList.add("dropdown-trigger")
+            serverDropdown.appendChild(dropdownTrigger)
 
-      let serverSelectorContent = document.getElementById("server-selector-dropdown-content")
-      for (let serverNum of Object.keys(data).sort((a, b) => a - b)) {
-        let dropdownItemDiv = document.createElement("div")
-        dropdownItemDiv.classList.add("dropdown-item", "is-dark")
+            let button = document.createElement("button")
+            button.classList.add("button", "is-dropdown-button")
+            button.id = `server-${serverNum}-dropdown-button`
+            button.setAttribute("aria-haspopup", true)
+            button.setAttribute("aria-controls", "dropdown-menu")
+            button.innerHTML = `<span>Server ${serverNum}</span>`
+            dropdownTrigger.appendChild(button)
 
-        let serverDropdown = document.createElement("div")
-        serverDropdown.classList.add("dropdown")
-        serverDropdown.id = `server-${serverNum}-dropdown`
-        dropdownItemDiv.appendChild(serverDropdown)
+            let dropdownMenu = document.createElement("div")
+            dropdownMenu.classList.add("dropdown-menu")
+            dropdownMenu.id = `server-${serverNum}-dropdown-menu`
+            dropdownMenu.setAttribute("role", "menu")
+            serverDropdown.appendChild(dropdownMenu)
 
-        let dropdownTrigger = document.createElement("div")
-        dropdownTrigger.classList.add("dropdown-trigger")
-        serverDropdown.appendChild(dropdownTrigger)
+            let dropdownContent = document.createElement("div")
+            dropdownContent.classList.add("dropdown-content")
+            dropdownMenu.appendChild(dropdownContent)
 
-        let button = document.createElement("button")
-        button.classList.add("button", "is-dropdown-button")
-        button.id = `server-${serverNum}-dropdown-button`
-        button.setAttribute("aria-haspopup", true)
-        button.setAttribute("aria-controls", "dropdown-menu")
-        button.innerHTML = `<span>Server ${serverNum}</span>`
-        dropdownTrigger.appendChild(button)
+            serverSelectorContent.appendChild(dropdownItemDiv)
+          }
 
-        let dropdownMenu = document.createElement("div")
-        dropdownMenu.classList.add("dropdown-menu")
-        dropdownMenu.id = `server-${serverNum}-dropdown-menu`
-        dropdownMenu.setAttribute("role", "menu")
-        serverDropdown.appendChild(dropdownMenu)
+          var dropdown = document.querySelector("#server-dropdown-button");
+          dropdown.addEventListener("click", function (event) {
+            event.stopPropagation();
+            document.querySelector("#server-dropdown").classList.toggle("is-active");
+          });
 
-        let dropdownContent = document.createElement("div")
-        dropdownContent.classList.add("dropdown-content")
-        dropdownMenu.appendChild(dropdownContent)
+          let dropdownContent = document.querySelector("#server-dropdown").querySelector(".dropdown-content").children
+          for (let child of dropdownContent) {
+            let dropDownServerButton = child.querySelector(".is-dropdown-button")
+            // console.log(dropDownServerButton)
+            if (dropDownServerButton != null) {
+              dropDownServerButton.addEventListener("click", function (event) {
+                let serverId = dropDownServerButton.id.match(/\d+/)[0]
+                if (document.querySelector(`#server-${serverId}-dropdown`).classList.contains("is-active")) {
+                  document.querySelector(`#server-${serverId}-dropdown`).classList.remove("is-active")
+                } else {
+                  for (let i = 1; i <= dropdownContent.length; i++) {
+                    try {
+                      if (i == serverId) continue;
+                      document.querySelector(`#server-${i}-dropdown`).classList.remove("is-active")
+                    } catch (e) { }
+                  }
+                  document.querySelector(`#server-${serverId}-dropdown`).classList.add("is-active")
+                }
 
-        serverSelectorContent.appendChild(dropdownItemDiv)
-      }
-
-      var dropdown = document.querySelector("#server-dropdown-button");
-      dropdown.addEventListener("click", function (event) {
-        event.stopPropagation();
-        document.querySelector("#server-dropdown").classList.toggle("is-active");
-      });
-
-      let dropdownContent = document.querySelector("#server-dropdown").querySelector(".dropdown-content").children
-      for (let child of dropdownContent) {
-        let dropDownServerButton = child.querySelector(".is-dropdown-button")
-        // console.log(dropDownServerButton)
-        if (dropDownServerButton != null) {
-          dropDownServerButton.addEventListener("click", function (event) {
-            let serverId = dropDownServerButton.id.match(/\d+/)[0]
-            if (document.querySelector(`#server-${serverId}-dropdown`).classList.contains("is-active")) {
-              document.querySelector(`#server-${serverId}-dropdown`).classList.remove("is-active")
-            } else {
-              for (let i = 1; i <= dropdownContent.length; i++) {
-                try {
-                  if (i == serverId) continue;
-                  document.querySelector(`#server-${i}-dropdown`).classList.remove("is-active")
-                } catch (e) { }
-              }
-              document.querySelector(`#server-${serverId}-dropdown`).classList.add("is-active")
+                // window.updateP5();
+              })
             }
+          }
 
-            // window.updateP5();
-          })
-        }
-      }
+          for (let [serverNum, rounds] of Object.entries(data)) {
+            let dropdownContent = document.querySelector(`#server-${serverNum}-dropdown-menu .dropdown-content`)
+            for (let roundTimestamp of Object.keys(rounds)) {
+              let dropdownItem = document.createElement("div")
+              dropdownItem.classList.add("dropdown-item", "is-dark")
 
-      for (let [serverNum, rounds] of Object.entries(data)) {
-        let dropdownContent = document.querySelector(`#server-${serverNum}-dropdown-menu .dropdown-content`)
-        for (let roundTimestamp of Object.keys(rounds)) {
-          let dropdownItem = document.createElement("div")
-          dropdownItem.classList.add("dropdown-item", "is-dark")
+              let button = document.createElement("button")
+              button.addEventListener("click", () => {
+                window.updateP5(serverNum, roundTimestamp)
+              })
+              button.innerText = new Date(parseInt(roundTimestamp)).toLocaleTimeString("en-US")
+              button.classList.add("button")
 
-          let button = document.createElement("button")
-          button.addEventListener("click", () => {
-            window.updateP5(serverNum, roundTimestamp)
-          })
-          button.innerText = new Date(parseInt(roundTimestamp)).toLocaleTimeString("en-US")
-          button.classList.add("button")
-
-          dropdownItem.appendChild(button)
-          dropdownContent.appendChild(dropdownItem)
-        }
-      }
-
+              dropdownItem.appendChild(button)
+              dropdownContent.appendChild(dropdownItem)
+            }
+          }
+        })
     }
   </script>
 </head>
@@ -144,11 +127,6 @@
       Update
     </button>
   </div> -->
-
-  <!-- lol don't worry about it I will make a better way soon -->
-  <p style="display:none;" id="data">
-    <%=data%>
-  </p>
 </body>
 
 </html>
