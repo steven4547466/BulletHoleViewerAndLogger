@@ -8,6 +8,7 @@
   <script src="./js/p5/p5.min.js"></script>
   <script src="./js/sketch.js"></script>
   <script>
+    let updateInterval;
     function onLoad(force) {
       fetch(window.location.protocol + "//" + window.location.host + "/bullets")
         .then(response => response.json())
@@ -106,6 +107,26 @@
           onLoad(true);
           window.refreshP5Data();
         })
+
+        let updater = document.getElementById("live-update")
+        updater.addEventListener("click", function (event) {
+          event.stopPropagation();
+          if (!updateInterval) {
+            updateInterval = setInterval(() => {
+              let serverSelectorContent = document.getElementById("server-selector-dropdown-content")
+              while (serverSelectorContent.firstChild) {
+                serverSelectorContent.removeChild(serverSelectorContent.firstChild)
+              }
+              onLoad(true);
+              window.refreshP5Data();
+            }, 5000);
+            updater.classList.add("active-outline")
+          } else {
+            clearInterval(updateInterval)
+            updateInterval = null
+            updater.classList.remove("active-outline")
+          }
+        })
       }
     }
   </script>
@@ -129,6 +150,9 @@
       </div>
       <button id="refresh-data" class="button">
         <span>Refresh</span>
+      </button>
+      <button id="live-update" class="button">
+        <span>Live Updates</span>
       </button>
     </div>
     <main class="column">

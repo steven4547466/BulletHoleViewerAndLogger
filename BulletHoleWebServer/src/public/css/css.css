@@ -2,3 +2,9 @@
   outline-style: solid;
   outline-color: aquamarine;
 }
+
+.active-outline {
+  outline-style: solid;
+  outline-color: lime;
+  outline-width: 0.1em;
+}
