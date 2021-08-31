@@ -13,7 +13,7 @@ namespace BulletHoleLogger
 
 		public bool IsDebugEnabled { get; set; } = false;
 
-		public string PostLocation { get; set; } = "http://localhost:4951/";
+		public string PostLocation { get; set; } = "http://localhost:4950/bullets";
 
 		public string Authentication { get; set; } = string.Empty;
 
