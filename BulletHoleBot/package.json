@@ -1,0 +1,16 @@
+{
+  "name": "bulletholebot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "author": "steven4547466",
+  "license": "ISC",
+  "dependencies": {
+    "canvas": "^2.8.0",
+    "eris": "^0.15.1",
+    "eris-components": "^1.0.1"
+  }
+}

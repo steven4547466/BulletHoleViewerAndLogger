@@ -1,0 +1,7 @@
+{
+  "token": "",
+  "prefix": "!",
+  "clientOptions": {},
+  "modRoles": [],
+  "requestAddress": "http://localhost:4950/bullets"
+}
