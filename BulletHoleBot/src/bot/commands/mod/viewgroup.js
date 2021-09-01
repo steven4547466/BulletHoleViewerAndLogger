@@ -163,7 +163,7 @@ class SetReaction extends Command {
   }
 
   drawBullets(group, midpoint, canvas, ctx) {
-    while (!group.group.every(b => (b.point[group.majorAxis] - midpoint[0] + canvas.width / 2) <= 1920 && (b.point[group.minorAxis] - midpoint[1] + canvas.height / 2) <= 1080)) {
+    while (!group.group.every(b => (b.point[group.majorAxis] - midpoint[0] + canvas.width / 2) <= canvas.width && (b.point[group.minorAxis] - midpoint[1] + canvas.height / 2) <= canvas.height)) {
       for (let bullet of group.group) {
         bullet.point = new Point3D(bullet.point.x / 2, bullet.point.y / 2, bullet.point.z / 2)
       }
