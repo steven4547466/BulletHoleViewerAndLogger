@@ -86,6 +86,12 @@ class SetReaction extends Command {
 
                 userGroups[userId] = groups
 
+                let totalGroups = 0
+                for (let [axis, g] of Object.entries(userGroups[userId])) {
+                  totalGroups += g.length
+                }
+                userGroups[userId].totalGroups = totalGroups
+
                 options.push(new ErisComponents.MenuOption()
                   .setLabel(`Select user ${parsedData[serverNum][roundTimestamp][userId].name}`)
                   .setValue(`${userId}`)
@@ -127,39 +133,65 @@ class SetReaction extends Command {
     collector.on('collect', (resBody) => action(collector, resBody, msg))
   }
 
-  sendBulletViewer(client, parsedData, serverNum, roundTimestamp, userId, rBody, userGroups, groupIndex) {
+  sendBulletViewer(client, parsedData, serverNum, roundTimestamp, userId, rBody, userGroups, groupIndex, view = "xy") {
     let time = Date.now()
     const canvas = Canvas.createCanvas(1920, 1080);
     const ctx = canvas.getContext("2d");
     ctx.fillStyle = "#666666";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    let midpoint = this.defineMidpoint(userGroups[userId][groupIndex])
-    this.drawBullets(userGroups[userId][groupIndex], midpoint, canvas, ctx)
+    if (!userGroups[userId][view]) view = Object.keys(userGroups[userId])[0]
+    let midpoint = this.defineMidpoint(userGroups[userId][view][groupIndex])
+    this.drawBullets(userGroups[userId][view][groupIndex], midpoint, canvas, ctx)
     let nextGroupButton = new ErisComponents.Button()
       .setStyle('blurple')
       .setLabel('>')
-      .setDisabled(userGroups[userId].length - 1 == groupIndex)
+      .setDisabled(userGroups[userId][view].length - 1 == groupIndex)
       .setID(`${time}-next-button`)
     let previousGroupButton = new ErisComponents.Button()
       .setStyle('blurple')
       .setLabel('<')
       .setDisabled(groupIndex == 0)
       .setID(`${time}-previous-button`)
+    console.log(userGroups[userId])
+    let xyButton = new ErisComponents.Button()
+      .setStyle('blurple')
+      .setLabel('View xy')
+      .setDisabled(view == "xy" || userGroups[userId]["xy"].length == 0)
+      .setID(`${time}-xy-button`)
+    let zyButton = new ErisComponents.Button()
+      .setStyle('blurple')
+      .setLabel('View zy')
+      .setDisabled(view == "zy" || userGroups[userId]["zy"].length == 0)
+      .setID(`${time}-zy-button`)
+    let xzButton = new ErisComponents.Button()
+      .setStyle('blurple')
+      .setLabel('View xz')
+      .setDisabled(view == "xz" || userGroups[userId]["xz"].length == 0)
+      .setID(`${time}-xz-button`)
     let actionRow = new ErisComponents.ActionRow()
-      .addComponents([previousGroupButton, nextGroupButton])
-    this.createComponents(client, rBody.message.channel_id, actionRow, { text: `Bullet viewer for ${parsedData[serverNum][roundTimestamp][userId].name} (${userId}). Bullet group ${groupIndex + 1}/${userGroups[userId].length}`, file: { file: canvas.toBuffer(), name: "bullets.png" } }, (body) => body.data.custom_id == `${time}-previous-button` || body.data.custom_id == `${time}-next-button`, (collector, resBody, msg) => {
-      try {
-        collector.stop()
-        client.erisClient.deleteMessage(msg.channel_id, msg.id)
-        if (resBody.data.custom_id.includes("next")) {
-          this.sendBulletViewer(client, parsedData, serverNum, roundTimestamp, userId, resBody, userGroups, groupIndex + 1)
-        } else {
-          this.sendBulletViewer(client, parsedData, serverNum, roundTimestamp, userId, resBody, userGroups, groupIndex - 1)
+      .addComponents([previousGroupButton, nextGroupButton, xyButton, zyButton, xzButton])
+    this.createComponents(client, rBody.message.channel_id, actionRow, { text: `Bullet viewer for ${parsedData[serverNum][roundTimestamp][userId].name} (${userId}). Plane view: ${view.toUpperCase()} Bullet group ${groupIndex + 1}/${userGroups[userId][view].length} (${userGroups[userId].totalGroups} total)`, file: { file: canvas.toBuffer(), name: "bullets.png" } },
+      (body) => body.data.custom_id == `${time}-previous-button` || body.data.custom_id == `${time}-next-button`
+        || body.data.custom_id == `${time}-xy-button` || body.data.custom_id == `${time}-zy-button` || body.data.custom_id == `${time}-xz-button`,
+      (collector, resBody, msg) => {
+        try {
+          collector.stop()
+          client.erisClient.deleteMessage(msg.channel_id, msg.id)
+          if (resBody.data.custom_id == `${time}-next-button`) {
+            this.sendBulletViewer(client, parsedData, serverNum, roundTimestamp, userId, resBody, userGroups, groupIndex + 1, view)
+          } else if (resBody.data.custom_id == `${time}-previous-button`) {
+            this.sendBulletViewer(client, parsedData, serverNum, roundTimestamp, userId, resBody, userGroups, groupIndex - 1, view)
+          } else if (resBody.data.custom_id == `${time}-xy-button`) {
+            this.sendBulletViewer(client, parsedData, serverNum, roundTimestamp, userId, resBody, userGroups, 0, "xy")
+          } else if (resBody.data.custom_id == `${time}-zy-button`) {
+            this.sendBulletViewer(client, parsedData, serverNum, roundTimestamp, userId, resBody, userGroups, 0, "zy")
+          } else if (resBody.data.custom_id == `${time}-xz-button`) {
+            this.sendBulletViewer(client, parsedData, serverNum, roundTimestamp, userId, resBody, userGroups, 0, "xz")
+          }
+        } catch (e) {
+          console.error(e)
         }
-      } catch (e) {
-        console.error(e)
-      }
-    })
+      })
   }
 
   drawBullets(group, midpoint, canvas, ctx) {
@@ -195,20 +227,22 @@ class SetReaction extends Command {
   }
 
   defineGroups(userId, holes, maxDist) {
-    let groups = []
+    let groups = { "xy": [], "zy": [], "xz": [] }
     let categorizedBullets = {}
     for (let axis of ["x", "y", "z"]) {
+      let majorAxis = axis == "x" ? "z" : "x"
+      let minorAxis = axis == "y" ? "z" : "y"
       for (let bullet of holes) {
         if (categorizedBullets[bullet.id] == axis) {
           continue
         }
-        groups.push({ group: this.branch(holes, bullet, axis, maxDist * fix || fix), majorAxis: axis == "x" ? "z" : "x", minorAxis: axis == "y" ? "z" : "y" })
-        for (let bullet of groups[groups.length - 1].group) {
+        groups[`${majorAxis}${minorAxis}`].push({ group: this.branch(holes, bullet, axis, maxDist * fix || fix), majorAxis, minorAxis })
+        for (let bullet of groups[`${majorAxis}${minorAxis}`][groups[`${majorAxis}${minorAxis}`].length - 1].group) {
           categorizedBullets[bullet.id] = axis
         }
       }
     }
-    return groups.filter(t => t.group.length > 5)
+    return { "xy": groups["xy"].filter(t => t.group.length > 5), "zy": groups["zy"].filter(t => t.group.length > 5), "xz": groups["xz"].filter(t => t.group.length > 5) }
   }
 }
 
