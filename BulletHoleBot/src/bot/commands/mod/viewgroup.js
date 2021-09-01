@@ -152,7 +152,6 @@ class SetReaction extends Command {
       .setLabel('<')
       .setDisabled(groupIndex == 0)
       .setID(`${time}-previous-button`)
-    console.log(userGroups[userId])
     let xyButton = new ErisComponents.Button()
       .setStyle('blurple')
       .setLabel('View xy')
