@@ -27,96 +27,67 @@ class SetReaction extends Command {
       res.setEncoding("utf8");
       let rawData = "";
       res.on("data", (chunk) => { rawData += chunk; });
-      res.on("end", () => {
+      res.on("end", async () => {
         try {
           const parsedData = JSON.parse(rawData);
-          let time = Date.now()
 
-          let options = []
+          let serverOptions = []
           for (let serverNum of Object.keys(parsedData).filter((a, b) => a - b)) {
-            options.push(new ErisComponents.MenuOption()
+            serverOptions.push(new ErisComponents.MenuOption()
               .setLabel(`Server ${serverNum}`)
               .setValue(`${serverNum}`)
               .setDescription(`Select server ${serverNum}`))
           }
 
-          let serverMenu = new ErisComponents.Menu()
-            .setPlaceholder(`Server selector`)
-            .setID(`${time}-server-selector`)
-            .setMaxValues(1)
-            .setMinValues(1)
-            .setDisabled(false)
-            .addOptions(options)
+          let paginatedServerOptions = this.paginate(serverOptions, 20)
+          const serverNum = await this.sendMenu(client, message.channel.id, paginatedServerOptions, 0, 1, 1, "Server selector")
 
-          this.createComponents(client, message.channel.id, serverMenu, { text: "Server Selector" }, (body) => body.data.custom_id == `${time}-server-selector`, (collector, resBody, msg) => {
-            const serverNum = resBody.data.values[0]
-            collector.stop()
-            client.erisClient.deleteMessage(msg.channel_id, msg.id)
-            let options = []
-            for (let roundTime of Object.keys(parsedData[serverNum]).filter((a, b) => a - b)) {
-              options.push(new ErisComponents.MenuOption()
-                .setLabel(`Round Timestamp ${new Date(parseInt(roundTime))}`)
-                .setValue(`${roundTime}`)
-                .setDescription(`Select round ${roundTime}`))
+          let roundOptions = []
+          for (let roundTime of Object.keys(parsedData[serverNum]).filter((a, b) => a - b)) {
+            roundOptions.push(new ErisComponents.MenuOption()
+              .setLabel(`Round Timestamp ${new Date(parseInt(roundTime))}`)
+              .setValue(`${roundTime}`)
+              .setDescription(`Select round ${roundTime}`))
+          }
+
+          let paginatedRoundOptions = this.paginate(roundOptions, 20)
+          const roundTimestamp = await this.sendMenu(client, message.channel.id, paginatedRoundOptions, 0, 1, 1, "Round selector")
+
+          const userGroups = {}
+
+          let userOptions = []
+          for (let userId of Object.keys(parsedData[serverNum][roundTimestamp])) {
+            let holes = []
+            for (let bullet of parsedData[serverNum][roundTimestamp][userId].bullets) {
+              holes.push(new BulletHole(userId, new Point3D(parseFloat(bullet.x * fix), parseFloat(-bullet.y * fix), parseFloat(bullet.z * fix)), "#000000"))
             }
 
-            let menu = new ErisComponents.Menu()
-              .setPlaceholder(`Round selector`)
-              .setID(`${time}-round-selector`)
-              .setMaxValues(1)
-              .setMinValues(1)
-              .setDisabled(false)
-              .addOptions(options)
-            this.createComponents(client, resBody.message.channel_id, menu, { text: "Round Selector" }, (body) => body.data.custom_id == `${time}-round-selector`, (collector, resBody, msg) => {
-              const roundTimestamp = resBody.data.values[0];
-              const userGroups = {}
-              collector.stop()
-              client.erisClient.deleteMessage(msg.channel_id, msg.id)
+            let groups = this.defineGroups(userId, holes, 0.01)
 
-              let options = []
-              for (let userId of Object.keys(parsedData[serverNum][roundTimestamp])) {
-                let holes = []
-                for (let bullet of parsedData[serverNum][roundTimestamp][userId].bullets) {
-                  holes.push(new BulletHole(userId, new Point3D(parseFloat(bullet.x * fix), parseFloat(-bullet.y * fix), parseFloat(bullet.z * fix)), "#000000"))
-                }
+            if (groups.length == 0) continue
 
-                let groups = this.defineGroups(userId, holes, 0.01)
+            userGroups[userId] = groups
 
-                if (groups.length == 0) continue
+            let totalGroups = 0
+            for (let [axis, g] of Object.entries(userGroups[userId])) {
+              totalGroups += g.length
+            }
+            userGroups[userId].totalGroups = totalGroups
 
-                userGroups[userId] = groups
+            userOptions.push(new ErisComponents.MenuOption()
+              .setLabel(`Select user ${parsedData[serverNum][roundTimestamp][userId].name}`)
+              .setValue(`${userId}`)
+              .setDescription(`Select user ${parsedData[serverNum][roundTimestamp][userId].name} (${userId})`))
+          }
 
-                let totalGroups = 0
-                for (let [axis, g] of Object.entries(userGroups[userId])) {
-                  totalGroups += g.length
-                }
-                userGroups[userId].totalGroups = totalGroups
+          if (userOptions.length == 0) return client.erisClient.createMessage(message.channel.id, "No bullet groups found.")
 
-                options.push(new ErisComponents.MenuOption()
-                  .setLabel(`Select user ${parsedData[serverNum][roundTimestamp][userId].name}`)
-                  .setValue(`${userId}`)
-                  .setDescription(`Select user ${parsedData[serverNum][roundTimestamp][userId].name} (${userId})`))
-              }
+          let paginatedUserOptions = this.paginate(userOptions, 20)
 
-              if (options.length == 0) return client.erisClient.createMessage(resBody.message.channel_id, "No bullet groups found.")
+          const userId = await this.sendMenu(client, message.channel.id, paginatedUserOptions, 0, 1, 1, "User selector")
 
-              let menu = new ErisComponents.Menu()
-                .setPlaceholder(`User selector`)
-                .setID(`${time}-user-selector`)
-                .setMaxValues(1)
-                .setMinValues(1)
-                .setDisabled(false)
-                .addOptions(options)
+          this.sendBulletViewer(client, parsedData, serverNum, roundTimestamp, userId, message.channel.id, userGroups, 0)
 
-              this.createComponents(client, resBody.message.channel_id, menu, { text: "User Selector" }, (body) => body.data.custom_id == `${time}-user-selector`, (collector, resBody, msg) => {
-                const userId = resBody.data.values[0];
-                collector.stop()
-                client.erisClient.deleteMessage(msg.channel_id, msg.id)
-                this.sendBulletViewer(client, parsedData, serverNum, roundTimestamp, userId, resBody, userGroups, 0)
-                // return message.channel.createMessage("", { file: canvas.toBuffer(), name: "bullets.png" });
-              })
-            })
-          })
         } catch (e) {
           return message.channel.createMessage(`Error while parsing: ${e.message}`);
         }
@@ -127,13 +98,60 @@ class SetReaction extends Command {
     // return message.channel.createMessage("Pog.", { file: canvas.toBuffer(), name: "Test.png" });
   }
 
-  async createComponents(client, channel, components, options, filter, action) {
-    let msg = await client.sendComponents(channel, components, options.text, options.file);
-    let collector = new ErisComponents.ComponentsCollector(client.erisClient, filter, channel, { time: options.time || 60000 }, null);
-    collector.on('collect', (resBody) => action(collector, resBody, msg))
+  createComponents(client, channel, components, options, filter, action) {
+    return new Promise(async (res, rej) => {
+      let msg = await client.sendComponents(channel, components, options.text, options.file);
+      let collector = new ErisComponents.ComponentsCollector(client.erisClient, filter, channel, { time: options.time || 60000 }, null);
+      collector.on('collect', (resBody) => {
+        res({ collector, resBody, msg })
+        if (action) action(collector, resBody, msg)
+      })
+    })
   }
 
-  sendBulletViewer(client, parsedData, serverNum, roundTimestamp, userId, rBody, userGroups, groupIndex, view = "xy") {
+  sendMenu(client, channel, paginatedOptions, page, max, min, text) {
+    return new Promise(async (res, rej) => {
+      let time = Date.now()
+      let previousPageButton = new ErisComponents.MenuOption()
+        .setLabel(`Previous page`)
+        .setValue(`${time}-prev-page`)
+
+      let nextPageButton = new ErisComponents.MenuOption()
+        .setLabel(`Next page`)
+        .setValue(`${time}-next-page`)
+
+      let options = []
+
+      if (page != 0) options.push(previousPageButton)
+
+      options = options.concat(paginatedOptions[page])
+
+      if (page < paginatedOptions.length - 1) options.push(nextPageButton)
+
+      let serverMenu = new ErisComponents.Menu()
+        .setPlaceholder(text)
+        .setID(`${time}-selector`)
+        .setMaxValues(max)
+        .setMinValues(min)
+        .setDisabled(false)
+        .addOptions(options)
+
+      let { collector, resBody, msg } = await this.createComponents(client, channel, serverMenu, { text }, (body) => body.data.custom_id == `${time}-selector`)
+
+      collector.stop()
+      client.erisClient.deleteMessage(msg.channel_id, msg.id)
+      let selection = resBody.data.values[0]
+      if (selection == `${time}-prev-page`) {
+        return res(await this.sendServerMenu(client, channel, paginatedOptions, page - 1, max, min, text))
+      } else if (selection == `${time}-next-page`) {
+        return res(await this.sendServerMenu(client, channel, paginatedOptions, page + 1, max, min, text))
+      }
+      res(selection)
+    })
+  }
+
+
+  sendBulletViewer(client, parsedData, serverNum, roundTimestamp, userId, channel, userGroups, groupIndex, view = "xy") {
     let time = Date.now()
     const canvas = Canvas.createCanvas(1920, 1080);
     const ctx = canvas.getContext("2d");
@@ -169,7 +187,7 @@ class SetReaction extends Command {
       .setID(`${time}-xz-button`)
     let actionRow = new ErisComponents.ActionRow()
       .addComponents([previousGroupButton, nextGroupButton, xyButton, zyButton, xzButton])
-    this.createComponents(client, rBody.message.channel_id, actionRow, { text: `Bullet viewer for ${parsedData[serverNum][roundTimestamp][userId].name} (${userId}). Plane view: ${view.toUpperCase()} Bullet group ${groupIndex + 1}/${userGroups[userId][view].length} (${userGroups[userId].totalGroups} total)`, file: { file: canvas.toBuffer(), name: "bullets.png" } },
+    this.createComponents(client, channel, actionRow, { text: `Bullet viewer for ${parsedData[serverNum][roundTimestamp][userId].name} (${userId}). Plane view: ${view.toUpperCase()} Bullet group ${groupIndex + 1}/${userGroups[userId][view].length} (${userGroups[userId].totalGroups} total)`, file: { file: canvas.toBuffer(), name: "bullets.png" } },
       (body) => body.data.custom_id == `${time}-previous-button` || body.data.custom_id == `${time}-next-button`
         || body.data.custom_id == `${time}-xy-button` || body.data.custom_id == `${time}-zy-button` || body.data.custom_id == `${time}-xz-button`,
       (collector, resBody, msg) => {
@@ -177,20 +195,32 @@ class SetReaction extends Command {
           collector.stop()
           client.erisClient.deleteMessage(msg.channel_id, msg.id)
           if (resBody.data.custom_id == `${time}-next-button`) {
-            this.sendBulletViewer(client, parsedData, serverNum, roundTimestamp, userId, resBody, userGroups, groupIndex + 1, view)
+            this.sendBulletViewer(client, parsedData, serverNum, roundTimestamp, userId, channel, userGroups, groupIndex + 1, view)
           } else if (resBody.data.custom_id == `${time}-previous-button`) {
-            this.sendBulletViewer(client, parsedData, serverNum, roundTimestamp, userId, resBody, userGroups, groupIndex - 1, view)
+            this.sendBulletViewer(client, parsedData, serverNum, roundTimestamp, userId, channel, userGroups, groupIndex - 1, view)
           } else if (resBody.data.custom_id == `${time}-xy-button`) {
-            this.sendBulletViewer(client, parsedData, serverNum, roundTimestamp, userId, resBody, userGroups, 0, "xy")
+            this.sendBulletViewer(client, parsedData, serverNum, roundTimestamp, userId, channel, userGroups, 0, "xy")
           } else if (resBody.data.custom_id == `${time}-zy-button`) {
-            this.sendBulletViewer(client, parsedData, serverNum, roundTimestamp, userId, resBody, userGroups, 0, "zy")
+            this.sendBulletViewer(client, parsedData, serverNum, roundTimestamp, userId, channel, userGroups, 0, "zy")
           } else if (resBody.data.custom_id == `${time}-xz-button`) {
-            this.sendBulletViewer(client, parsedData, serverNum, roundTimestamp, userId, resBody, userGroups, 0, "xz")
+            this.sendBulletViewer(client, parsedData, serverNum, roundTimestamp, userId, channel, userGroups, 0, "xz")
           }
         } catch (e) {
           console.error(e)
         }
       })
+  }
+
+  paginate(array, perChunk = 20) {
+    let arrays = array.reduce((resultArray, item, x) => {
+      const chunkIndex = Math.floor(x / perChunk)
+      if (!resultArray[chunkIndex]) {
+        resultArray[chunkIndex] = []
+      }
+      resultArray[chunkIndex].push(item)
+      return resultArray
+    }, [])
+    return arrays
   }
 
   drawBullets(group, midpoint, canvas, ctx) {
