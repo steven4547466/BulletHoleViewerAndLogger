@@ -128,7 +128,7 @@ class SetReaction extends Command {
 
       if (page < paginatedOptions.length - 1) options.push(nextPageButton)
 
-      let serverMenu = new ErisComponents.Menu()
+      let menu = new ErisComponents.Menu()
         .setPlaceholder(text)
         .setID(`${time}-selector`)
         .setMaxValues(max)
@@ -136,15 +136,15 @@ class SetReaction extends Command {
         .setDisabled(false)
         .addOptions(options)
 
-      let { collector, resBody, msg } = await this.createComponents(client, channel, serverMenu, { text }, (body) => body.data.custom_id == `${time}-selector`)
+      let { collector, resBody, msg } = await this.createComponents(client, channel, menu, { text }, (body) => body.data.custom_id == `${time}-selector`)
 
       collector.stop()
       client.erisClient.deleteMessage(msg.channel_id, msg.id)
       let selection = resBody.data.values[0]
       if (selection == `${time}-prev-page`) {
-        return res(await this.sendServerMenu(client, channel, paginatedOptions, page - 1, max, min, text))
+        return res(await this.sendMenu(client, channel, paginatedOptions, page - 1, max, min, text))
       } else if (selection == `${time}-next-page`) {
-        return res(await this.sendServerMenu(client, channel, paginatedOptions, page + 1, max, min, text))
+        return res(await this.sendMenu(client, channel, paginatedOptions, page + 1, max, min, text))
       }
       res(selection)
     })
